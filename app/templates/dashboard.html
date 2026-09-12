@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>Platform Health</title>
+
+  <link
+    rel="stylesheet"
+    href="/static/css/dashboard.css"
+  >
+</head>
+
+<body>
+
+  <div class="app-shell">
+
+    <header class="topbar">
+
+      <div class="brand">
+        <div class="brand-mark">
+          PH
+        </div>
+
+        <div>
+          <div class="brand-name">
+            Platform Health
+          </div>
+
+          <div class="brand-subtitle">
+            Automation Platform Reliability
+          </div>
+        </div>
+      </div>
+
+      <div class="environment">
+        <span class="environment-dot"></span>
+        LAB
+      </div>
+
+    </header>
+
+
+    <main class="dashboard">
+
+      <section class="overview">
+
+        <div>
+          <p class="eyebrow">
+            Platform status
+          </p>
+
+          <h1>
+            Automation Platform
+          </h1>
+
+          <p class="overview-description">
+            Live health and reliability overview for AWX and
+            the underlying Kubernetes platform.
+          </p>
+        </div>
+
+
+        <div
+          id="overall-status"
+          class="overall-status status-loading"
+        >
+
+          <span
+            id="overall-indicator"
+            class="status-indicator"
+          ></span>
+
+          <div>
+            <span class="status-label">
+              Overall status
+            </span>
+
+            <strong id="overall-status-text">
+              Loading
+            </strong>
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <section class="summary-grid">
+
+        <article class="summary-card">
+
+          <span class="summary-label">
+            Components
+          </span>
+
+          <strong
+            id="component-count"
+            class="summary-value"
+          >
+            —
+          </strong>
+
+          <span class="summary-note">
+            Monitored services
+          </span>
+
+        </article>
+
+
+        <article class="summary-card">
+
+          <span class="summary-label">
+            Healthy
+          </span>
+
+          <strong
+            id="healthy-count"
+            class="summary-value"
+          >
+            —
+          </strong>
+
+          <span class="summary-note">
+            Operating normally
+          </span>
+
+        </article>
+
+
+        <article class="summary-card">
+
+          <span class="summary-label">
+            Issues
+          </span>
+
+          <strong
+            id="issue-count"
+            class="summary-value"
+          >
+            —
+          </strong>
+
+          <span class="summary-note">
+            Require attention
+          </span>
+
+        </article>
+
+
+        <article class="summary-card">
+
+          <span class="summary-label">
+            Last check
+          </span>
+
+          <strong
+            id="last-check"
+            class="summary-value summary-time"
+          >
+            —
+          </strong>
+
+          <span class="summary-note">
+            Automatic refresh
+          </span>
+
+        </article>
+
+      </section>
+
+
+      <section class="platform-section">
+
+        <div class="section-header">
+
+          <div>
+            <p class="eyebrow">
+              Automation platform
+            </p>
+
+            <h2>
+              AWX
+            </h2>
+          </div>
+
+          <span class="section-description">
+            Application and supporting workloads
+          </span>
+
+        </div>
+
+
+        <div
+          id="automation-components"
+          class="component-grid"
+        ></div>
+
+      </section>
+
+
+      <section class="platform-section">
+
+        <div class="section-header">
+
+          <div>
+            <p class="eyebrow">
+              Infrastructure
+            </p>
+
+            <h2>
+              Kubernetes
+            </h2>
+          </div>
+
+          <span class="section-description">
+            Cluster API and node health
+          </span>
+
+        </div>
+
+
+        <div
+          id="kubernetes-components"
+          class="component-grid"
+        ></div>
+
+      </section>
+
+
+      <section class="operational-footer">
+
+        <div class="refresh-state">
+
+          <span
+            id="refresh-indicator"
+            class="refresh-indicator"
+          ></span>
+
+          <span id="refresh-text">
+            Live monitoring active
+          </span>
+
+        </div>
+
+
+        <div class="api-link">
+
+          <a
+            href="/docs"
+            target="_blank"
+          >
+            API Documentation
+          </a>
+
+          <span>·</span>
+
+          <a
+            href="/api/v1/status"
+            target="_blank"
+          >
+            Raw status
+          </a>
+
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+
+  <script src="/static/js/dashboard.js"></script>
+
+</body>
+</html>

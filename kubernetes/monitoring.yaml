@@ -1,0 +1,423 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 10s
+      evaluation_interval: 10s
+
+    rule_files:
+      - /etc/prometheus/rules/alerts.yml
+
+    scrape_configs:
+      - job_name: platform-health
+        metrics_path: /metrics
+        static_configs:
+          - targets:
+              - platform-health.platform-health.svc.cluster.local:80
+
+  alerts.yml: |
+    groups:
+      - name: platform-health
+        rules:
+          - alert: PlatformHealthDegraded
+            expr: platform_health_overall_status < 1
+            for: 30s
+            labels:
+              severity: warning
+            annotations:
+              summary: "Platform Health is degraded"
+              description: "One or more monitored platform components are unhealthy."
+
+          - alert: PlatformComponentUnhealthy
+            expr: platform_health_component_status < 1
+            for: 30s
+            labels:
+              severity: critical
+            annotations:
+              summary: "Platform component is unhealthy"
+              description: "Component {{ $labels.component }} is not healthy."
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: prometheus
+
+  template:
+    metadata:
+      labels:
+        app: prometheus
+
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.55.1
+
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+
+          ports:
+            - name: http
+              containerPort: 9090
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus/prometheus.yml
+              subPath: prometheus.yml
+
+            - name: config
+              mountPath: /etc/prometheus/rules/alerts.yml
+              subPath: alerts.yml
+
+            - name: data
+              mountPath: /prometheus
+
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+
+        - name: data
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  selector:
+    app: prometheus
+
+  ports:
+    - name: http
+      port: 9090
+      targetPort: 9090
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource
+  namespace: monitoring
+data:
+  datasource.yaml: |
+    apiVersion: 1
+
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus.monitoring.svc.cluster.local:9090
+        isDefault: true
+        editable: false
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+  namespace: monitoring
+data:
+  dashboard.yaml: |
+    apiVersion: 1
+
+    providers:
+      - name: Platform Health
+        orgId: 1
+        folder: Platform Health
+        type: file
+        disableDeletion: false
+        editable: true
+
+        options:
+          path: /var/lib/grafana/dashboards
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-platform-health-dashboard
+  namespace: monitoring
+data:
+  platform-health.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "panels": [
+        {
+          "title": "Overall platform status",
+          "type": "stat",
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 0,
+            "y": 0
+          },
+          "targets": [
+            {
+              "expr": "platform_health_overall_status",
+              "legendFormat": "Platform"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "min": 0,
+              "max": 1,
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "1": {
+                      "text": "HEALTHY"
+                    },
+                    "0.5": {
+                      "text": "DEGRADED"
+                    },
+                    "0": {
+                      "text": "DOWN"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "title": "Healthy components",
+          "type": "stat",
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 6,
+            "y": 0
+          },
+          "targets": [
+            {
+              "expr": "count(platform_health_component_status == 1)",
+              "legendFormat": "Healthy"
+            }
+          ]
+        },
+        {
+          "title": "Components with issues",
+          "type": "stat",
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 12,
+            "y": 0
+          },
+          "targets": [
+            {
+              "expr": "count(platform_health_component_status < 1)",
+              "legendFormat": "Issues"
+            }
+          ]
+        },
+        {
+          "title": "AWX API latency",
+          "type": "stat",
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 18,
+            "y": 0
+          },
+          "targets": [
+            {
+              "expr": "platform_health_component_latency_ms{component=\"awx-api\"}",
+              "legendFormat": "AWX API"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms"
+            }
+          }
+        },
+        {
+          "title": "Component health history",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 0,
+            "y": 6
+          },
+          "targets": [
+            {
+              "expr": "platform_health_component_status",
+              "legendFormat": "{{component}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "min": -1,
+              "max": 1
+            }
+          }
+        },
+        {
+          "title": "Component latency",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 12,
+            "y": 6
+          },
+          "targets": [
+            {
+              "expr": "platform_health_component_latency_ms",
+              "legendFormat": "{{component}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms"
+            }
+          }
+        }
+      ],
+      "refresh": "10s",
+      "schemaVersion": 39,
+      "tags": [
+        "platform-health",
+        "sre"
+      ],
+      "templating": {
+        "list": []
+      },
+      "time": {
+        "from": "now-30m",
+        "to": "now"
+      },
+      "timezone": "browser",
+      "title": "Platform Health",
+      "uid": "platform-health",
+      "version": 1
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: grafana
+
+  template:
+    metadata:
+      labels:
+        app: grafana
+
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 472
+        runAsGroup: 472
+
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.3.0
+
+          ports:
+            - name: http
+              containerPort: 3000
+
+          env:
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "true"
+
+            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+              value: "Viewer"
+
+            - name: GF_USERS_DEFAULT_THEME
+              value: "dark"
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          volumeMounts:
+            - name: datasource
+              mountPath: /etc/grafana/provisioning/datasources
+
+            - name: dashboard-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+
+            - name: dashboard
+              mountPath: /var/lib/grafana/dashboards
+
+            - name: data
+              mountPath: /var/lib/grafana
+
+      volumes:
+        - name: datasource
+          configMap:
+            name: grafana-datasource
+
+        - name: dashboard-provider
+          configMap:
+            name: grafana-dashboard-provider
+
+        - name: dashboard
+          configMap:
+            name: grafana-platform-health-dashboard
+
+        - name: data
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  selector:
+    app: grafana
+
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000

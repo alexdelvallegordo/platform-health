@@ -2,60 +2,69 @@ import asyncio
 
 import httpx
 
-from app.services.awx import check_awx_health
+from app.services.checkers.awx import AWXChecker
 
 
-def run_check(handler):
+def run_checker(handler):
     transport = httpx.MockTransport(handler)
 
-    async def run():
-        async with httpx.AsyncClient(
-            transport=transport,
-        ) as client:
-            return await check_awx_health(client)
+    checker = AWXChecker(
+        transport=transport,
+    )
 
-    return asyncio.run(run())
+    return asyncio.run(
+        checker.check()
+    )[0]
 
 
 def test_awx_healthy():
+
     def handler(request):
         return httpx.Response(
             status_code=200,
-            json={"version": "24.6.1"},
+            json={
+                "version": "24.6.1",
+            },
         )
 
-    result = run_check(handler)
+    result = run_checker(handler)
 
-    assert result["name"] == "awx"
-    assert result["status"] == "healthy"
-    assert result["latency_ms"] >= 0
-    assert "detail" not in result
+    assert result.id == "awx-api"
+    assert result.status == "healthy"
+
+    assert result.metadata["http_status"] == 200
+    assert result.metadata["version"] == "24.6.1"
+
+    assert result.latency_ms is not None
 
 
 def test_awx_http_error():
+
     def handler(request):
         return httpx.Response(
             status_code=500,
         )
 
-    result = run_check(handler)
+    result = run_checker(handler)
 
-    assert result["name"] == "awx"
-    assert result["status"] == "unhealthy"
-    assert result["latency_ms"] >= 0
-    assert result["detail"] == "Unexpected HTTP status: 500"
+    assert result.status == "down"
+
+    assert (
+        result.detail
+        == "Unexpected HTTP status: 500"
+    )
 
 
 def test_awx_timeout():
+
     def handler(request):
         raise httpx.ConnectTimeout(
             "AWX connection timed out",
             request=request,
         )
 
-    result = run_check(handler)
+    result = run_checker(handler)
 
-    assert result["name"] == "awx"
-    assert result["status"] == "unhealthy"
-    assert result["latency_ms"] >= 0
-    assert "timed out" in result["detail"]
+    assert result.status == "down"
+    assert result.detail is not None
+    assert "timed out" in result.detail
