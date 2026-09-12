@@ -1,15 +1,19 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel
 
-
-class ComponentHealth(BaseModel):
-    name: str
-    status: Literal["healthy", "unhealthy"]
-    latency_ms: float
-    detail: str | None = None
+from app.models.component import ComponentHealth
 
 
-class PlatformHealthResponse(BaseModel):
-    status: Literal["healthy", "degraded", "unhealthy"]
+PlatformStatus = Literal[
+    "healthy",
+    "degraded",
+    "down",
+]
+
+
+class PlatformStatusResponse(BaseModel):
+    status: PlatformStatus
+    checked_at: datetime
     components: list[ComponentHealth]

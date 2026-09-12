@@ -1,19 +1,35 @@
 from fastapi import APIRouter
 
+from app.core.config import settings
 from app.models.health import HealthResponse
 
 
-router = APIRouter()
+router = APIRouter(
+    tags=["Health"]
+)
 
 
 @router.get(
-    "/health",
+    "/health/live",
     response_model=HealthResponse,
-    tags=["Health"],
 )
-async def health_check() -> HealthResponse:
+async def liveness() -> HealthResponse:
+
     return HealthResponse(
-        status="healthy",
-        service="platform-health",
-        version="0.1.0",
+        status="alive",
+        service=settings.app_name,
+        version=settings.app_version,
+    )
+
+
+@router.get(
+    "/health/ready",
+    response_model=HealthResponse,
+)
+async def readiness() -> HealthResponse:
+
+    return HealthResponse(
+        status="ready",
+        service=settings.app_name,
+        version=settings.app_version,
     )
